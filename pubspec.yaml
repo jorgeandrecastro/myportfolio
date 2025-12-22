@@ -1,0 +1,46 @@
+name: my_portfolio
+description: "Mon portfolio personnel connecté à Supabase."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # --- UI & Design ---
+  cupertino_icons: ^1.0.6
+  google_fonts: ^6.2.1        # Pour la typographie sans fichiers assets
+  flutter_markdown: ^0.7.2    # Pour rendre les descriptions riches
+
+  # --- Navigation & URL ---
+  go_router: ^14.2.0          # Navigation déclarative
+  url_launcher: ^6.3.0        # Pour ouvrir les liens externes (GitHub, LinkedIn)
+
+  # --- Backend & Data ---
+  supabase_flutter: ^2.6.0    # Client officiel Supabase (Auth + DB + Storage)
+
+  # --- Gestion de fichiers ---
+  image_picker: ^1.1.2        # Pour sélectionner les images depuis la galerie
+  mime: ^1.0.5                # Pour détecter le type de fichier (jpg/png) avant upload
+  youtube_player_iframe: ^5.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  
+  # Linter standard pour garder le code propre
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  # Ajout des assets locaux pour les sprites déco (fusée, donuts, etc.)
+  #assets:
+    #- assets/images/
+
+  # Nous gardons Google Fonts pour la typo principale
+  # Et Supabase Storage pour les images du portfolio
