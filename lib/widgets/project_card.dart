@@ -12,7 +12,7 @@ class ProjectCard extends StatelessWidget {
     final hasVideo = project.videoUrl != null && project.videoUrl!.isNotEmpty;
 
     return AspectRatio(
-      aspectRatio: 1.4, // ⭐ Ratio responsive au lieu de hauteur fixe
+      aspectRatio: 1.4,
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -40,7 +40,7 @@ class ProjectCard extends StatelessWidget {
               children: [
                 // --- MÉDIA ---
                 Flexible(
-                  flex: 5, // ⭐ 5 parts pour l'image
+                  flex: 5,
                   child: SizedBox(
                     width: double.infinity,
                     child: hasVideo
@@ -56,32 +56,38 @@ class ProjectCard extends StatelessWidget {
 
                 // --- CONTENU TEXTE ---
                 Flexible(
-                  flex: 4, // ⭐ 4 parts pour le contenu
+                  flex: 4,
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // --- TAG NOIR ---
+                        // --- TAGS NOIRS ---
                         if (project.tags.isNotEmpty)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              project.tags.first.toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                letterSpacing: 1.1,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: project.tags.map((tag) {
+                              return Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  tag.toUpperCase(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    letterSpacing: 1.1,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
                           ),
 
                         const SizedBox(height: 14),
