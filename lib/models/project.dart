@@ -6,7 +6,8 @@ class Project {
   final String? videoUrl;
   final String? linkUrl;
   final List<String> tags;
-  final bool isFeatured; // AJOUTÉ : Pour la mise en avant Apple Pro Luxe
+  final List<String> gallery; // NOUVEAU : Collection d'images
+  final bool isFeatured;
 
   Project({
     required this.id,
@@ -16,7 +17,8 @@ class Project {
     this.videoUrl,
     this.linkUrl,
     required this.tags,
-    this.isFeatured = false, // Par défaut à false
+    this.gallery = const [], // NOUVEAU : Par défaut liste vide
+    this.isFeatured = false,
   });
 
   factory Project.fromMap(Map<String, dynamic> map) {
@@ -27,9 +29,12 @@ class Project {
       imageUrl: map['image_url'],
       videoUrl: map['video_url'],
       linkUrl: map['link_url'],
-      isFeatured: map['is_featured'] ?? false, // RÉCUPÉRATION : du booléen
+      isFeatured: map['is_featured'] ?? false,
       tags:
           (map['tags'] as List?)?.map((item) => item.toString()).toList() ?? [],
+      gallery:
+          (map['gallery'] as List?)?.map((item) => item.toString()).toList() ??
+              [], // NOUVEAU
     );
   }
 
@@ -40,8 +45,9 @@ class Project {
       'image_url': imageUrl,
       'video_url': videoUrl,
       'link_url': linkUrl,
-      'is_featured': isFeatured, // ENVOI : vers Supabase
+      'is_featured': isFeatured,
       'tags': tags,
+      'gallery': gallery, // NOUVEAU : Envoi vers Supabase
     };
   }
 }

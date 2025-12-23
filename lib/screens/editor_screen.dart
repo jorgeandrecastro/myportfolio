@@ -8,6 +8,10 @@ import '../models/project.dart';
 import '../services/admin_service.dart';
 import '../services/storage_service.dart';
 import '../widgets/layout_container.dart';
+import '../widgets/cover_image_picker.dart';
+import '../widgets/gallery_image_grid.dart';
+import '../widgets/fullscreen_image_viewer.dart';
+import '../widgets/featured_switch.dart';
 
 class EditorScreen extends StatefulWidget {
   final Project? project;
@@ -28,7 +32,8 @@ class _EditorScreenState extends State<EditorScreen> {
   late TextEditingController _tagsCtrl;
 
   String? _imageUrl;
-  bool _isFeatured = false; // AJOUTÉ : État local pour le projet VIP
+  List<String> _galleryUrls = [];
+  bool _isFeatured = false;
   bool _loading = false;
 
   @override
@@ -41,7 +46,8 @@ class _EditorScreenState extends State<EditorScreen> {
     _videoCtrl = TextEditingController(text: p?.videoUrl ?? '');
     _tagsCtrl = TextEditingController(text: p?.tags.join(', ') ?? '');
     _imageUrl = p?.imageUrl;
-    _isFeatured = p?.isFeatured ?? false; // RÉCUPÉRATION : du champ isFeatured
+    _isFeatured = p?.isFeatured ?? false;
+    _galleryUrls = List<String>.from(p?.gallery ?? []);
   }
 
   @override
@@ -55,36 +61,9 @@ class _EditorScreenState extends State<EditorScreen> {
     super.dispose();
   }
 
-  InputDecoration _vipInput(String label, {IconData? icon}) {
-    return InputDecoration(
-      labelText: label.toUpperCase(),
-      labelStyle: const TextStyle(
-          color: Colors.grey,
-          fontSize: 10,
-          letterSpacing: 1.5,
-          fontWeight: FontWeight.bold),
-      floatingLabelBehavior: FloatingLabelBehavior.always,
-      filled: true,
-      fillColor: const Color(0xFFF9F9F9),
-      prefixIcon:
-          icon != null ? Icon(icon, size: 18, color: Colors.black) : null,
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.black.withOpacity(0.05)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.black, width: 1.5),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.redAccent, width: 0.5),
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-    );
-  }
+  // ===== IMAGE DE COUVERTURE =====
 
-  Future<void> _pickImage() async {
+  Future<void> _pickCoverImage() async {
     final ImagePicker picker = ImagePicker();
     final XFile? image =
         await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
@@ -96,14 +75,99 @@ class _EditorScreenState extends State<EditorScreen> {
         final url = await StorageService().uploadImage(image.name, bytes, mime);
         setState(() => _imageUrl = url);
       } catch (e) {
-        if (mounted)
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text("Erreur upload: $e")));
+        if (mounted) {
+          _showError("Erreur upload: $e");
+        }
       } finally {
         setState(() => _loading = false);
       }
     }
   }
+
+  void _removeCoverImage() {
+    setState(() => _imageUrl = null);
+  }
+
+  void _viewCoverImage() {
+    if (_imageUrl == null) return;
+
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black,
+        pageBuilder: (context, _, __) => FullscreenImageViewer(
+          imageUrl: _imageUrl!,
+          onDelete: () {
+            Navigator.pop(context);
+            _removeCoverImage();
+          },
+        ),
+      ),
+    );
+  }
+
+  // ===== GALERIE =====
+
+  Future<void> _pickGalleryImages() async {
+    final ImagePicker picker = ImagePicker();
+    final List<XFile> images = await picker.pickMultiImage(imageQuality: 80);
+
+    if (images.isNotEmpty) {
+      setState(() => _loading = true);
+      try {
+        for (final image in images) {
+          final bytes = await image.readAsBytes();
+          final mime = lookupMimeType(image.path) ?? 'image/jpeg';
+          final url =
+              await StorageService().uploadImage(image.name, bytes, mime);
+          setState(() => _galleryUrls.add(url));
+        }
+      } catch (e) {
+        if (mounted) {
+          _showError("Erreur upload galerie: $e");
+        }
+      } finally {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  void _removeGalleryImage(int index) {
+    setState(() => _galleryUrls.removeAt(index));
+  }
+
+  void _viewGalleryImage(int index) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black,
+        pageBuilder: (context, _, __) => FullscreenImageViewer(
+          imageUrl: _galleryUrls[index],
+          onDelete: () {
+            Navigator.pop(context);
+            _removeGalleryImage(index);
+          },
+        ),
+      ),
+    );
+  }
+
+  void _reorderGalleryImages(int oldIndex, int newIndex) {
+    setState(() {
+      // Créer une nouvelle liste pour forcer le rebuild
+      final newList = List<String>.from(_galleryUrls);
+
+      // Swap
+      final temp = newList[oldIndex];
+      newList[oldIndex] = newList[newIndex];
+      newList[newIndex] = temp;
+
+      // Remplacer la liste complète
+      _galleryUrls = newList;
+    });
+  }
+
+  // ===== SAUVEGARDE =====
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
@@ -122,20 +186,28 @@ class _EditorScreenState extends State<EditorScreen> {
         'video_url': _videoCtrl.text.isEmpty ? null : _videoCtrl.text,
         'image_url': _imageUrl,
         'tags': tags,
-        'is_featured':
-            _isFeatured, // ENVOI : Mise à jour de la colonne Supabase
+        'is_featured': _isFeatured,
+        'gallery': _galleryUrls,
       };
 
       await AdminService().upsertProject(widget.project, data);
       if (mounted) context.go('/portfolio');
     } catch (e) {
-      if (mounted)
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text("Erreur sauvegarde: $e")));
+      if (mounted) {
+        _showError("Erreur sauvegarde: $e");
+      }
     } finally {
       setState(() => _loading = false);
     }
   }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  // ===== UI =====
 
   @override
   Widget build(BuildContext context) {
@@ -161,20 +233,35 @@ class _EditorScreenState extends State<EditorScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _sectionHeader("Mise en avant"),
-                    _buildFeaturedSwitch(), // AJOUTÉ : Le Switch VIP
-
+                    FeaturedSwitch(
+                      isFeatured: _isFeatured,
+                      onChanged: (value) => setState(() => _isFeatured = value),
+                    ),
                     const SizedBox(height: 40),
                     _sectionHeader("Visuel de couverture"),
-                    _buildImagePicker(),
-
+                    CoverImagePicker(
+                      imageUrl: _imageUrl,
+                      loading: _loading,
+                      onPick: _pickCoverImage,
+                      onRemove: _removeCoverImage,
+                      onView: _viewCoverImage,
+                    ),
+                    const SizedBox(height: 40),
+                    _sectionHeader("Galerie d'images"),
+                    GalleryImageGrid(
+                      imageUrls: _galleryUrls,
+                      loading: _loading,
+                      onAddImages: _pickGalleryImages,
+                      onRemoveImage: _removeGalleryImage,
+                      onViewImage: _viewGalleryImage,
+                      onReorder: _reorderGalleryImages,
+                    ),
                     const SizedBox(height: 40),
                     _sectionHeader("Détails du projet"),
                     _buildTextFields(),
-
                     const SizedBox(height: 40),
                     _sectionHeader("Média & Références"),
                     _buildMediaFields(),
-
                     const SizedBox(height: 56),
                     _buildSaveButton(),
                   ],
@@ -187,33 +274,6 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
-  // --- NOUVEAU WIDGET : SWITCH APPLE LUXE ---
-  Widget _buildFeaturedSwitch() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: _isFeatured ? Colors.black.withOpacity(0.02) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-            color: _isFeatured ? Colors.black : Colors.black12, width: 1.5),
-      ),
-      child: SwitchListTile(
-        title: const Text("METTRE EN AVANT (HOME PAGE)",
-            style: TextStyle(
-                fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1)),
-        subtitle: const Text(
-            "Le projet apparaîtra dans la section VIP de l'accueil.",
-            style: TextStyle(fontSize: 10, color: Colors.grey)),
-        value: _isFeatured,
-        activeColor: Colors.black,
-        contentPadding: EdgeInsets.zero,
-        onChanged: (bool value) => setState(() => _isFeatured = value),
-      ),
-    );
-  }
-
-  // --- AUTRES COMPOSANTS (LOGIQUE PRÉSERVÉE) ---
-
   PreferredSizeWidget _buildAppBar() {
     return PreferredSize(
       preferredSize: const Size.fromHeight(60),
@@ -222,12 +282,14 @@ class _EditorScreenState extends State<EditorScreen> {
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: AppBar(
             title: Text(
-                (widget.project == null ? "Nouveau Projet" : "Édition")
-                    .toUpperCase(),
-                style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2.5)),
+              (widget.project == null ? "Nouveau Projet" : "Édition")
+                  .toUpperCase(),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2.5,
+              ),
+            ),
             centerTitle: true,
             backgroundColor: Colors.white.withOpacity(0.7),
             foregroundColor: Colors.black,
@@ -238,67 +300,59 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
-  Widget _buildImagePicker() {
-    return GestureDetector(
-      onTap: _pickImage,
-      child: Container(
-        height: 240,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF2F2F2),
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: Colors.black.withOpacity(0.05)),
+  Widget _buildTextFields() {
+    return Column(
+      children: [
+        TextFormField(
+          controller: _titleCtrl,
+          decoration:
+              _vipInput("Nom du projet", icon: Icons.auto_awesome_outlined),
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+            letterSpacing: -0.5,
+          ),
+          validator: (v) => v!.isEmpty ? 'Titre requis' : null,
         ),
-        child: _imageUrl != null
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(28),
-                child: Image.network(_imageUrl!, fit: BoxFit.cover))
-            : const Center(
-                child: Icon(Icons.add_a_photo_outlined, color: Colors.black26)),
-      ),
+        const SizedBox(height: 24),
+        TextFormField(
+          controller: _descCtrl,
+          maxLines: 8,
+          decoration: _vipInput("Description"),
+          style:
+              const TextStyle(height: 1.7, fontSize: 15, color: Colors.black87),
+          validator: (v) => v!.isEmpty ? 'Description requise' : null,
+        ),
+        const SizedBox(height: 24),
+        TextFormField(
+          controller: _tagsCtrl,
+          decoration: _vipInput("Expertises (Tags)", icon: Icons.api_outlined),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        ),
+      ],
     );
   }
 
-  Widget _buildTextFields() {
-    return Column(children: [
-      TextFormField(
-        controller: _titleCtrl,
-        decoration:
-            _vipInput("Nom du projet", icon: Icons.auto_awesome_outlined),
-        style: const TextStyle(
-            fontWeight: FontWeight.bold, fontSize: 20, letterSpacing: -0.5),
-        validator: (v) => v!.isEmpty ? 'Titre requis' : null,
-      ),
-      const SizedBox(height: 24),
-      TextFormField(
-        controller: _descCtrl,
-        maxLines: 8,
-        decoration: _vipInput("Description"),
-        style:
-            const TextStyle(height: 1.7, fontSize: 15, color: Colors.black87),
-        validator: (v) => v!.isEmpty ? 'Description requise' : null,
-      ),
-      const SizedBox(height: 24),
-      TextFormField(
-        controller: _tagsCtrl,
-        decoration: _vipInput("Expertises (Tags)", icon: Icons.api_outlined),
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-      ),
-    ]);
-  }
-
   Widget _buildMediaFields() {
-    return Column(children: [
-      TextFormField(
+    return Column(
+      children: [
+        TextFormField(
           controller: _videoCtrl,
-          decoration: _vipInput("Lien Vidéo (YouTube)",
-              icon: Icons.play_circle_outline_rounded)),
-      const SizedBox(height: 24),
-      TextFormField(
+          decoration: _vipInput(
+            "Lien Vidéo (YouTube)",
+            icon: Icons.play_circle_outline_rounded,
+          ),
+        ),
+        const SizedBox(height: 24),
+        TextFormField(
           controller: _linkCtrl,
-          decoration: _vipInput("Lien du projet (Live)",
-              icon: Icons.north_east_rounded)),
-    ]);
+          decoration: _vipInput(
+            "Lien du projet (Live)",
+            icon: Icons.north_east_rounded,
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildSaveButton() {
@@ -312,14 +366,18 @@ class _EditorScreenState extends State<EditorScreen> {
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 26),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20)),
+                  borderRadius: BorderRadius.circular(20),
+                ),
               ),
               onPressed: _save,
-              child: Text("Publier les modifications".toUpperCase(),
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 3,
-                      fontSize: 11)),
+              child: Text(
+                "Publier les modifications".toUpperCase(),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 3,
+                  fontSize: 11,
+                ),
+              ),
             ),
           );
   }
@@ -327,12 +385,45 @@ class _EditorScreenState extends State<EditorScreen> {
   Widget _sectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 16),
-      child: Text(title.toUpperCase(),
-          style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 2,
-              color: Colors.black45)),
+      child: Text(
+        title.toUpperCase(),
+        style: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 2,
+          color: Colors.black45,
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _vipInput(String label, {IconData? icon}) {
+    return InputDecoration(
+      labelText: label.toUpperCase(),
+      labelStyle: const TextStyle(
+        color: Colors.grey,
+        fontSize: 10,
+        letterSpacing: 1.5,
+        fontWeight: FontWeight.bold,
+      ),
+      floatingLabelBehavior: FloatingLabelBehavior.always,
+      filled: true,
+      fillColor: const Color(0xFFF9F9F9),
+      prefixIcon:
+          icon != null ? Icon(icon, size: 18, color: Colors.black) : null,
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.black.withOpacity(0.05)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.black, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.redAccent, width: 0.5),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
     );
   }
 }

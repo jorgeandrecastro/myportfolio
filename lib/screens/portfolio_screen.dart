@@ -5,7 +5,7 @@ import '../services/portfolio_service.dart';
 import '../models/project.dart';
 import '../widgets/project_card.dart';
 import '../widgets/layout_container.dart';
-import '../widgets/filter_bar.dart'; // Nouvel import
+import '../widgets/filter_bar.dart';
 import '../supabase/supabase_client.dart';
 
 class PortfolioScreen extends StatefulWidget {
@@ -17,8 +17,9 @@ class PortfolioScreen extends StatefulWidget {
 
 class _PortfolioScreenState extends State<PortfolioScreen> {
   final PortfolioService _service = PortfolioService();
-  String _selectedFilter = "Tous";
   final ScrollController _mainScrollController = ScrollController();
+
+  String _selectedFilter = "Tous";
 
   @override
   void dispose() {
@@ -36,13 +37,15 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
         return Scaffold(
           backgroundColor: Colors.white,
           appBar: AppBar(
-            title: const Text("MES PROJETS",
-                style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.w300,
-                  letterSpacing: 5, // Plus d'espace pour le côté VIP
-                  fontSize: 15,
-                )),
+            title: const Text(
+              "MES PROJETS",
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.w300,
+                letterSpacing: 5,
+                fontSize: 15,
+              ),
+            ),
             backgroundColor: Colors.white,
             elevation: 0,
             centerTitle: true,
@@ -53,8 +56,10 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
             ),
             actions: [
               IconButton(
-                icon: Icon(isAdmin ? Icons.lock_open : Icons.lock_outline,
-                    size: 20),
+                icon: Icon(
+                  isAdmin ? Icons.lock_open : Icons.lock_outline,
+                  size: 20,
+                ),
                 onPressed: () => context.go('/login'),
               ),
             ],
@@ -64,7 +69,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
             thumbVisibility: true,
             thickness: 4,
             radius: const Radius.circular(10),
-            thumbColor: Colors.black.withOpacity(0.15), // Très léger
+            thumbColor: Colors.black.withOpacity(0.15),
             padding: const EdgeInsets.only(right: 2),
             child: CustomScrollView(
               controller: _mainScrollController,
@@ -76,8 +81,9 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                     child: FutureBuilder<List<Project>>(
                       future: _service.getProjects(),
                       builder: (context, snapshot) {
-                        if (!snapshot.hasData)
+                        if (!snapshot.hasData) {
                           return const SizedBox(height: 100);
+                        }
 
                         final allProjects = snapshot.data!;
                         final tags = allProjects
@@ -110,9 +116,13 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const SliverFillRemaining(
-                          child: Center(
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 1, color: Colors.black)));
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1,
+                            color: Colors.black,
+                          ),
+                        ),
+                      );
                     }
 
                     final projects = snapshot.data ?? [];

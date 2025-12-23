@@ -219,7 +219,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(width: 10),
           const Text(
-            "Actuellement disponible pour de nouveaux projets",
+            "Disponible pour de nouveaux projets",
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
